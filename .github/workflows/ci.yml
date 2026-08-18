@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # HSDEV-48923: yarn deps resolve via Artifactory npm-virtual on self-hosted-gha.
+  yarn-ci:
+    name: yarn-ci
+    runs-on: self-hosted-gha
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.19.0"
+
+      # setup-node cache: yarn fails if yarn is not on PATH yet
+      - name: Enable yarn
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+
+      - name: Show npm registry
+        run: npm config get registry
+
+      # ignore-scripts: canvas@1 native rebuild needs cairo and fails on modern Node;
+      # Artifactory fetch is the migration gate (HSDEV-48923).
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts
